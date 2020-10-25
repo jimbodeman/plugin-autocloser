@@ -105,7 +105,7 @@ class CloserPlugin extends Plugin {
                     // Admin note is just text
                     $admin_note = $config->get('admin-note-' . $group_id) ?: FALSE;
 
-                    // Fetch the actual content of the reply, "html" means load with images, 
+                    // Fetch the actual content of the reply, "html" means load with images,
                     // I don't think it works with attachments though.
                     $admin_reply = $config->get('admin-reply-' . $group_id);
                     if (is_numeric($admin_reply) && $admin_reply) {
@@ -184,14 +184,15 @@ class CloserPlugin extends Plugin {
     private function is_time_to_run(PluginConfig $config) {
         // We can store arbitrary things in the config, like, when we ran this last:
         $last_run = $config->get('last-run');
-        $now = Misc::dbtime(); // Never assume about time.. 
+        $now = Misc::dbtime(); // Never assume about time..
         $config->set('last-run', $now);
 
         // assume a freqency of "Every Cron" means it is always overdue
         $next_run = 0;
 
         // Convert purge frequency to a comparable format to timestamps:
-        if ($freq_in_config = (int) $config->get('purge-frequency')) {
+        $fr=($config->get('frequency') > 0) ? $config->get('frequency') : 0;
+        if ($freq_in_config = (int) $fr) {
             // Calculate when we want to run next, config hours into seconds,
             // plus the last run is the timestamp of the next scheduled run
             $next_run = $last_run + ($freq_in_config * 3600);
@@ -284,7 +285,7 @@ class CloserPlugin extends Plugin {
 
         $sql = sprintf(
                 "
-SELECT ticket_id 
+SELECT ticket_id
 FROM %s WHERE lastupdate < DATE_SUB(NOW(), INTERVAL %d DAY)
 AND status_id=%d %s
 ORDER BY ticket_id ASC
@@ -356,6 +357,7 @@ LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
         // Build an array of values to send to the ticket's postReply function
         // 'emailcollab' => FALSE // don't send notification to all collaborators.. maybe.. dunno.
         $vars = [
+            'reply-to' => 'all',
             'response' => $custom_reply
         ];
         $errors = [];
@@ -404,7 +406,7 @@ LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
         foreach ($thread->getEntries()->all() as $entry) {
             if ($this->is_valid_thread_entry($entry, FALSE, TRUE)) {
                 // We'll just render each response, overwriting the previous one..
-                // screw it. 
+                // screw it.
                 $last = $this->render_thread_entry($entry);
             }
         }
@@ -424,7 +426,7 @@ LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
             return $msg;
         }
 
-        // Iterate through all the thread entries (in order), 
+        // Iterate through all the thread entries (in order),
         // Not sure the ->order_by() thing even does anything.
         foreach ($thread->getEntries()
                 ->order_by('created', QuerySet::ASC)
@@ -448,7 +450,7 @@ LIMIT %d", TICKET_TABLE, $age_days, $from_status, $whereFilter, $max);
         $from = ($entry->get('type') == 'R') ? 'Sent' : 'Received';
         $tag = ($entry->get('format') == 'text') ? 'pre' : 'p';
         $when = Format::datetime(strtotime($entry->get('created')));
-        // TODO: Maybe make this a CannedResponse or admin template? 
+        // TODO: Maybe make this a CannedResponse or admin template?
         return <<<PIECE
 <hr />
 <p class="thread">
